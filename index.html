@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>5 分鐘計時器</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: #0f0f0f;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  .bar {
+    width: 100%;
+    max-width: 720px;
+    height: 72px;
+    background: #161616;
+    border: 1px solid #2a2a2a;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .progress-bg {
+    position: absolute;
+    inset: 0;
+    background: #1a3a2a;
+    transform-origin: left;
+    transform: scaleX(1);
+    transition: transform 0.5s linear, background 0.4s;
+    border-radius: 12px;
+    z-index: 0;
+  }
+
+  .label {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    color: #555;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    z-index: 1;
+    white-space: nowrap;
+    min-width: 60px;
+  }
+
+  .divider {
+    width: 1px;
+    height: 24px;
+    background: #2a2a2a;
+    z-index: 1;
+    flex-shrink: 0;
+  }
+
+  .time {
+    font-family: 'DM Mono', monospace;
+    font-size: 28px;
+    font-weight: 500;
+    color: #e8e8e8;
+    letter-spacing: -0.02em;
+    z-index: 1;
+    min-width: 80px;
+    transition: color 0.4s;
+  }
+
+  .track-wrap {
+    flex: 1;
+    height: 4px;
+    background: #222;
+    border-radius: 99px;
+    z-index: 1;
+    overflow: hidden;
+  }
+
+  .track-fill {
+    height: 100%;
+    width: 100%;
+    background: #3ecf8e;
+    border-radius: 99px;
+    transform-origin: left;
+    transform: scaleX(1);
+    transition: transform 0.5s linear, background 0.4s;
+  }
+
+  .status {
+    font-size: 11px;
+    color: #444;
+    z-index: 1;
+    min-width: 72px;
+    text-align: right;
+    letter-spacing: 0.04em;
+    transition: color 0.3s;
+  }
+
+  .btn-group {
+    display: flex;
+    gap: 6px;
+    z-index: 1;
+    flex-shrink: 0;
+  }
+
+  button {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 7px;
+    border: 1px solid #2a2a2a;
+    background: #1e1e1e;
+    color: #aaa;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    letter-spacing: 0.04em;
+  }
+
+  button:hover { background: #252525; color: #e8e8e8; border-color: #383838; }
+
+  button.start-btn {
+    background: #1a3a2a;
+    color: #3ecf8e;
+    border-color: #2a5a3a;
+  }
+  button.start-btn:hover { background: #1f4a32; color: #5edfa0; }
+
+  button.danger { color: #cf3e3e; }
+
+  .flash-anim { animation: blink 0.7s ease infinite alternate; }
+  @keyframes blink { from { opacity: 1; } to { opacity: 0.25; } }
+
+  .done-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 12px;
+    border: 1.5px solid #cf3e3e;
+    z-index: 2;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+</style>
+</head>
+<body>
+
+<div class="bar" id="bar">
+  <div class="progress-bg" id="progressBg"></div>
+  <div class="done-ring" id="doneRing"></div>
+
+  <span class="label">5 min</span>
+  <div class="divider"></div>
+  <div class="time" id="timeDisplay">5:00</div>
+
+  <div class="track-wrap">
+    <div class="track-fill" id="trackFill"></div>
+  </div>
+
+  <span class="status" id="statusText"></span>
+
+  <div class="btn-group">
+    <button class="start-btn" id="mainBtn" onclick="toggle()">開始</button>
+    <button onclick="reset()">重置</button>
+  </div>
+</div>
+
+<script>
+  const TOTAL = 5 * 60;
+  let remaining = TOTAL;
+  let running = false;
+  let iv = null;
+
+  const timeEl = document.getElementById('timeDisplay');
+  const fillEl = document.getElementById('trackFill');
+  const bgEl = document.getElementById('progressBg');
+  const mainBtn = document.getElementById('mainBtn');
+  const statusEl = document.getElementById('statusText');
+  const doneRing = document.getElementById('doneRing');
+
+  function fmt(s) {
+    return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  }
+
+  function updateVisuals() {
+    const ratio = remaining / TOTAL;
+    fillEl.style.transform = `scaleX(${ratio})`;
+    bgEl.style.transform = `scaleX(${ratio})`;
+
+    if (ratio > 0.5) {
+      fillEl.style.background = '#3ecf8e';
+      bgEl.style.background = '#1a3a2a';
+      timeEl.style.color = '#e8e8e8';
+    } else if (ratio > 0.2) {
+      fillEl.style.background = '#f0a500';
+      bgEl.style.background = '#2e2210';
+      timeEl.style.color = '#f0c060';
+    } else {
+      fillEl.style.background = '#cf3e3e';
+      bgEl.style.background = '#2e1010';
+      timeEl.style.color = '#e87070';
+    }
+  }
+
+  function tick() {
+    if (remaining <= 0) {
+      clearInterval(iv);
+      running = false;
+      remaining = 0;
+      timeEl.textContent = '0:00';
+      timeEl.classList.add('flash-anim');
+      mainBtn.textContent = '開始';
+      mainBtn.className = 'start-btn';
+      statusEl.textContent = '時間到';
+      statusEl.style.color = '#cf3e3e';
+      doneRing.style.opacity = '1';
+      return;
+    }
+    remaining--;
+    timeEl.textContent = fmt(remaining);
+    updateVisuals();
+
+    if (remaining === 60) { statusEl.textContent = '剩 1 分鐘'; statusEl.style.color = '#f0a500'; }
+    else if (remaining === 30) { statusEl.textContent = '剩 30 秒'; statusEl.style.color = '#cf3e3e'; }
+    else if (remaining === 10) { statusEl.textContent = '最後 10 秒'; }
+  }
+
+  function toggle() {
+    if (remaining <= 0) return;
+    if (running) {
+      clearInterval(iv);
+      running = false;
+      mainBtn.textContent = '繼續';
+      statusEl.textContent = '已暫停';
+      statusEl.style.color = '#555';
+    } else {
+      timeEl.classList.remove('flash-anim');
+      iv = setInterval(tick, 1000);
+      running = true;
+      mainBtn.textContent = '暫停';
+      if (remaining === TOTAL) { statusEl.textContent = ''; }
+    }
+  }
+
+  function reset() {
+    clearInterval(iv);
+    running = false;
+    remaining = TOTAL;
+    timeEl.textContent = fmt(TOTAL);
+    timeEl.classList.remove('flash-anim');
+    timeEl.style.color = '#e8e8e8';
+    mainBtn.textContent = '開始';
+    mainBtn.className = 'start-btn';
+    statusEl.textContent = '';
+    statusEl.style.color = '#444';
+    doneRing.style.opacity = '0';
+    fillEl.style.transform = 'scaleX(1)';
+    fillEl.style.background = '#3ecf8e';
+    bgEl.style.transform = 'scaleX(1)';
+    bgEl.style.background = '#1a3a2a';
+  }
+
+  updateVisuals();
+</script>
+</body>
+</html>
