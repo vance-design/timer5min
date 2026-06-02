@@ -210,6 +210,28 @@
     }
   }
 
+  function playBeep(freq, duration, delay) {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    setTimeout(() => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.5, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + duration);
+    }, delay);
+  }
+
+  function playTripleBeep() {
+    playBeep(880, 0.18, 0);
+    playBeep(880, 0.18, 280);
+    playBeep(880, 0.35, 560);
+  }
+
   function tick() {
     if (remaining <= 0) {
       clearInterval(iv);
@@ -222,6 +244,7 @@
       statusEl.textContent = '時間到';
       statusEl.style.color = '#cf3e3e';
       doneRing.style.opacity = '1';
+      playTripleBeep();
       return;
     }
     remaining--;
