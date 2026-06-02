@@ -232,6 +232,10 @@
     playBeep(880, 0.35, 560);
   }
 
+  function playHalfBeep() {
+    playBeep(600, 0.3, 0);
+  }
+
   function tick() {
     if (remaining <= 0) {
       clearInterval(iv);
@@ -254,6 +258,7 @@
     if (remaining === 60) { statusEl.textContent = '剩 1 分鐘'; statusEl.style.color = '#f0a500'; }
     else if (remaining === 30) { statusEl.textContent = '剩 30 秒'; statusEl.style.color = '#cf3e3e'; }
     else if (remaining === 10) { statusEl.textContent = '最後 10 秒'; }
+    if (remaining === Math.floor(TOTAL / 2)) { playHalfBeep(); }
   }
 
   function toggle() {
